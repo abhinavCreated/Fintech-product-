@@ -1,0 +1,11 @@
+Stage,Users Reached,Conversion from Previous Stage (%),Drop-off from Previous Stage (%),Conversion from Install (%)
+Install,10000,100,0,100
+SignUp_MobileEntry,8086,80.9,19.1,80.9
+OTP_Verified,6812,84.2,15.8,68.1
+PersonalDetails_Entered,5998,88.1,11.9,60
+PAN_Entered,4470,74.5,25.5,44.7
+Aadhaar_DocUploaded,2748,61.5,38.5,27.5
+Liveness_Passed,2280,83,17,22.8
+KYC_Success,2055,90.1,9.9,20.5
+BankAccount_Linked,1494,72.7,27.3,14.9
+First_Funded_Txn,1295,86.7,13.3,13

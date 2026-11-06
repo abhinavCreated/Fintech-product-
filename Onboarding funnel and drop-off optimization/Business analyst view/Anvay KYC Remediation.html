@@ -1,0 +1,600 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Anvay KYC Remediation</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: step rail (the "leak") | phone with switchable flow | decision notes. Metric + cause-to-fix below. */
+:root{
+  --ground:#e7edef; --surface:#f5f8f8; --ink:#0f1f2a; --ink-2:#4a5c66; --line:#c3d0d5;
+  --fix:#0a6b66; --fix-ink:#ffffff; --fix-soft:#d3ece8;
+  --leak:#c92f46; --leak-soft:#f6d9de;
+  --device:#0f1f2a;
+  /* phone UI is always light, like a real screen */
+  --p-old-bg:#eceff1; --p-new-bg:#fbfcfb; --p-ink:#13212b; --p-mute:#5d6d77; --p-line:#cfd8dc;
+  --p-card:#ffffff; --p-old-btn:#4b5d73; --p-new-btn:#0a6b66; --p-btn-ink:#ffffff;
+  --p-bad:#c92f46; --p-bad-soft:#f9e3e6; --p-good-soft:#d9efeb;
+  --display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --body:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ground:#0b1418; --surface:#121f26; --ink:#e6eff0; --ink-2:#9db0b8; --line:#26373f;
+  --fix:#3cc2b6; --fix-ink:#04201e; --fix-soft:#12332f; --leak:#ff6b81; --leak-soft:#3a1a21; --device:#25383f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --ground:#0b1418; --surface:#121f26; --ink:#e6eff0; --ink-2:#9db0b8; --line:#26373f;
+  --fix:#3cc2b6; --fix-ink:#04201e; --fix-soft:#12332f; --leak:#ff6b81; --leak-soft:#3a1a21; --device:#25383f; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:40px 64px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.02em}
+p{margin:0}
+:focus-visible{outline:3px solid var(--fix);outline-offset:2px}
+button{font:inherit;cursor:pointer}
+
+/* header */
+.eyebrow{font:500 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+header{display:flex;flex-direction:column;gap:14px;max-width:820px}
+h1{font-size:clamp(28px,4.4vw,46px);line-height:1.05;font-weight:700}
+h1 em{font-style:normal;color:var(--leak)}
+.lede{color:var(--ink-2);font-size:16px;max-width:64ch}
+.lede b{color:var(--ink);font-weight:600}
+
+/* controls */
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:999px;padding:3px;gap:2px;background:var(--surface)}
+.seg button{border:0;background:none;color:var(--ink);padding:8px 20px;border-radius:999px;font-weight:600;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+.seg button[data-flow="improved"][aria-pressed="true"]{background:var(--fix);color:var(--fix-ink)}
+.ghostbtn{border:0;background:none;color:var(--ink-2);text-decoration:underline;text-underline-offset:3px;font-size:14px;padding:8px 4px}
+.hint{font-size:13px;color:var(--ink-2)}
+
+/* stage */
+.stage{display:grid;grid-template-columns:210px 360px minmax(0,1fr);gap:36px;align-items:start}
+.rail{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;position:relative}
+.rail::before{content:"";position:absolute;left:11px;top:14px;bottom:14px;width:2px;background:var(--line)}
+.rail li{position:relative;padding:0 0 26px 38px;min-height:58px;color:var(--ink-2)}
+.rail li:last-child{padding-bottom:0}
+.rail .dot{position:absolute;left:3px;top:2px;width:18px;height:18px;border-radius:50%;background:var(--ground);border:2px solid var(--line)}
+.rail .lbl{display:block;font-weight:600;font-size:14px}
+.rail .sub{display:block;font:400 12px/1.35 var(--mono);margin-top:2px}
+.rail li.done .dot{background:var(--ink-2);border-color:var(--ink-2)}
+.rail li.now{color:var(--ink)}
+.rail li.now .dot{border-color:var(--ink);background:var(--ink)}
+.rail li.leak .sub{color:var(--leak);font-weight:500}
+.rail li.leak .dot{border-color:var(--leak)}
+.rail li.leak.now .dot{background:var(--leak)}
+.rail li.leak .dot::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid var(--leak);opacity:.35;animation:pulse 2s ease-out infinite}
+.mode-improved .rail li.leak .sub{color:var(--fix)}
+.mode-improved .rail li.leak .dot{border-color:var(--fix)}
+.mode-improved .rail li.leak.now .dot{background:var(--fix)}
+.mode-improved .rail li.leak .dot::after{border-color:var(--fix);animation:none;opacity:.3}
+@keyframes pulse{0%{transform:scale(.7);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+.funnelnote{margin-top:22px;font:400 12px/1.45 var(--mono);color:var(--ink-2);border-top:1px solid var(--line);padding-top:12px}
+.funnelnote b{color:var(--ink);font-weight:500}
+
+/* phone */
+.phonewrap{display:flex;justify-content:center}
+.phone{width:min(360px,100%);height:716px;background:var(--device);border-radius:48px;padding:10px;position:relative}
+.screen{width:100%;height:100%;border-radius:38px;overflow:hidden;position:relative;background:var(--p-new-bg);color:var(--p-ink);font-family:var(--body)}
+.sb{position:absolute;top:0;left:0;right:0;height:38px;display:flex;justify-content:space-between;align-items:center;padding:6px 26px 0;font:600 13px var(--body);z-index:3;pointer-events:none}
+.sb i{width:60px;height:18px;border-radius:12px;background:#0f1f2a;position:absolute;left:50%;top:9px;transform:translateX(-50%)}
+.scr{position:absolute;inset:0;padding:50px 22px 24px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.scr.old{background:var(--p-old-bg)}
+.scr.new{background:var(--p-new-bg)}
+.brand{font:700 20px var(--display);letter-spacing:-.03em}
+.old .brand{font-size:17px;color:var(--p-old-btn)}
+.new .brand{color:var(--p-new-btn)}
+.prog{display:flex;gap:5px}
+.prog span{flex:1;height:4px;border-radius:3px;background:var(--p-line)}
+.prog span.on{background:var(--p-new-btn)}
+.proglbl{font:500 11px var(--mono);color:var(--p-mute);letter-spacing:.04em;text-transform:uppercase}
+.h{font:700 26px/1.1 var(--display);letter-spacing:-.025em;text-wrap:balance}
+.old .h{font-size:20px;letter-spacing:-.01em;font-family:var(--body);font-weight:600}
+.p{font-size:14px;line-height:1.45;color:var(--p-mute)}
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld label{font-size:12px;font-weight:600;color:var(--p-mute)}
+.old .fld label{text-transform:uppercase;letter-spacing:.04em;font-size:11px}
+.in{font:500 17px var(--body);color:var(--p-ink);background:var(--p-card);border:1.5px solid var(--p-line);border-radius:12px;padding:13px 14px;width:100%}
+.old .in{border-radius:4px;font-size:15px}
+.in:focus-visible{outline:3px solid var(--p-new-btn)}
+.in.otp{letter-spacing:.5em;font:500 22px var(--mono);text-align:center}
+.btn{width:100%;border:0;border-radius:14px;padding:15px 16px;font-weight:600;font-size:16px;color:var(--p-btn-ink);background:var(--p-new-btn)}
+.old .btn{border-radius:4px;background:var(--p-old-btn);font-size:15px}
+.btn[disabled]{opacity:.38;cursor:not-allowed}
+.lnk{border:0;background:none;color:var(--p-new-btn);font-weight:600;font-size:14px;text-decoration:underline;text-underline-offset:3px;padding:6px;align-self:center}
+.old .lnk{color:var(--p-mute);font-weight:500}
+.spacer{flex:1}
+.fine{font-size:12px;color:var(--p-mute);line-height:1.4;text-align:center}
+.up{border:1.5px dashed var(--p-mute);border-radius:4px;padding:22px 10px;text-align:center;font-size:13px;color:var(--p-mute);background:var(--p-card)}
+.ups{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.errbox{background:var(--p-bad-soft);border:1px solid var(--p-bad);color:var(--p-bad);border-radius:4px;padding:14px;font-size:14px;line-height:1.4}
+.errbox b{display:block;font-size:15px;margin-bottom:2px}
+.gone{background:#101c24;color:#e6eff0}
+.gone .h,.gone .p{color:#e6eff0}
+.gone .p{opacity:.75}
+.big{font:700 54px/1 var(--display);letter-spacing:-.04em;color:#ff6b81}
+.card{background:var(--p-card);border:1.5px solid var(--p-line);border-radius:14px;padding:14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two h4{margin:0 0 6px;font:600 11px var(--mono);letter-spacing:.05em;text-transform:uppercase}
+.two ul{margin:0;padding:0;list-style:none;font-size:13px;line-height:1.55}
+.two .yes h4{color:var(--p-new-btn)}
+.two .no h4{color:var(--p-bad)}
+.two li::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;background:currentColor;opacity:.8}
+.two .yes li::before{background:var(--p-new-btn)}
+.two .no li::before{background:var(--p-bad)}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4;cursor:pointer;padding-right:22px}
+.chk input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--p-new-btn);flex:none}
+.chip{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--body);background:var(--p-good-soft);color:var(--p-new-btn);border-radius:999px;padding:5px 11px;align-self:center}
+.cam{position:relative;border-radius:16px;background:linear-gradient(160deg,#2a3a44,#16232b);height:230px;display:flex;align-items:center;justify-content:center}
+.cam .frame{width:78%;height:56%;position:relative}
+.cam .frame i{position:absolute;width:26px;height:26px;border:3px solid #fff;transition:border-color .3s}
+.cam .frame i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0;border-radius:8px 0 0 0}
+.cam .frame i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0;border-radius:0 8px 0 0}
+.cam .frame i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0;border-radius:0 0 0 8px}
+.cam .frame i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0;border-radius:0 0 8px 0}
+.cam.ok .frame i{border-color:#6fe3c9}
+.cam .hintchip{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;font:500 13px var(--body);padding:6px 12px;border-radius:999px;white-space:nowrap}
+.spin{width:44px;height:44px;border-radius:50%;border:4px solid var(--p-line);border-top-color:var(--p-new-btn);animation:sp 1s linear infinite;align-self:center}
+@keyframes sp{to{transform:rotate(360deg)}}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:9px 0;border-bottom:1px solid var(--p-line)}
+.row:last-child{border:0}
+.row span{color:var(--p-mute)}
+.row b{font-weight:600;text-align:right}
+.ok{width:64px;height:64px;border-radius:50%;background:var(--p-new-btn);display:grid;place-items:center;align-self:flex-start}
+.ok svg{width:30px;height:30px}
+.rel{position:relative}
+.pin{position:absolute;right:-4px;top:-11px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:var(--leak);color:#fff;font:600 11px var(--mono);display:grid;place-items:center;padding:0;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.mode-improved .pin{background:var(--fix);color:var(--fix-ink)}
+.pin:hover,.pin:focus-visible{transform:scale(1.15)}
+
+/* notes */
+.notes{display:flex;flex-direction:column;gap:16px;min-width:0}
+.ncard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:14px}
+.tag{align-self:flex-start;font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:5px 10px;border-radius:6px;background:var(--leak-soft);color:var(--leak)}
+.tag.fix{background:var(--fix-soft);color:var(--fix)}
+.tag.plain{background:var(--line);color:var(--ink-2)}
+.ncard h2{font-size:24px;line-height:1.15}
+.ncard .txt{color:var(--ink-2);max-width:60ch}
+.decide{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:4px}
+.decide .k{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.decide p{max-width:60ch}
+.reqs{display:flex;flex-wrap:wrap;gap:6px}
+.reqs span{font:500 12px var(--mono);border:1px solid var(--line);border-radius:6px;padding:3px 8px;color:var(--ink-2)}
+.pins{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.pins li{display:flex;gap:10px;font-size:14px;padding:8px 10px;border-radius:10px;border:1px solid transparent}
+.pins li b{flex:none;width:22px;height:22px;border-radius:50%;background:var(--leak);color:#fff;font:600 11px var(--mono);display:grid;place-items:center}
+.mode-improved .pins li b{background:var(--fix);color:var(--fix-ink)}
+.pins li.on{border-color:var(--ink-2);background:var(--ground)}
+.metricbar{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:13px;color:var(--ink-2);border:1px dashed var(--line);border-radius:12px;padding:10px 14px}
+.metricbar b{color:var(--ink);font-weight:600}
+
+/* below the stage */
+section{display:flex;flex-direction:column;gap:18px}
+h2.sec{font-size:26px}
+.cf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.cfc{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.cfc .q{font:600 17px/1.25 var(--display);letter-spacing:-.01em}
+.cfc .arrow{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--fix)}
+.cfc p{color:var(--ink-2);font-size:14px}
+.metric{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px}
+.metric h3{font-size:20px}
+.big2{display:flex;gap:28px;flex-wrap:wrap;margin:6px 0 14px}
+.big2 div{display:flex;flex-direction:column}
+.big2 .n{font:700 44px/1 var(--display);letter-spacing:-.04em}
+.big2 .n.red{color:var(--leak)}
+.big2 .l{font-size:13px;color:var(--ink-2);max-width:22ch}
+.scale{margin-top:6px}
+.track{position:relative;height:16px;border-radius:8px;background:var(--line)}
+.track .fillbar{position:absolute;left:0;top:0;bottom:0;border-radius:8px;background:var(--leak)}
+.track .tgt{position:absolute;top:-6px;bottom:-6px;width:3px;background:var(--fix);border-radius:2px}
+.ticks{position:relative;height:34px;font:400 11px var(--mono);color:var(--ink-2)}
+.ticks span{position:absolute;top:6px;transform:translateX(-50%);white-space:nowrap}
+.ticks span.s{transform:none}
+.ticks span.e{transform:translateX(-100%)}
+.ticks .t1{color:var(--leak);top:18px}
+.ticks .t2{color:var(--fix);top:18px}
+.mlist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;font-size:14px}
+.mlist li b{display:block;font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2);margin-bottom:2px}
+.legend{border:1px solid var(--line);border-radius:16px;overflow:auto;background:var(--surface)}
+.legend table{border-collapse:collapse;width:100%;min-width:520px;font-size:14px}
+.legend th,.legend td{text-align:left;padding:10px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+.legend tr:last-child td{border:0}
+.legend th{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.legend td:first-child{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.foot{font-size:13px;color:var(--ink-2);max-width:78ch}
+
+@media (max-width:1060px){
+  .stage{grid-template-columns:360px minmax(0,1fr)}
+  .rail{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;gap:8px 28px}
+  .rail::before{display:none}
+  .rail li{padding:0 0 0 28px;min-height:0}
+  .rail .dot{left:0}
+  .funnelnote{grid-column:1/-1;margin-top:0}
+}
+@media (max-width:820px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .cf,.metric{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap" id="app" data-mode="before">
+  <header>
+    <div class="eyebrow">Clickable prototype · Anvay Money (fictional neobank)</div>
+    <h1>Two in three new users never finish KYC. <em>One screen</em> loses the most.</h1>
+    <p class="lede">In my simulated 10,000-user funnel, <b>67% dropped before finishing onboarding</b>, and <b>38.5% were lost at Aadhaar upload</b>. This prototype shows that screen today and the version I'd ship. Switch between them, tap through, and read the decision on the right.</p>
+  </header>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Choose which flow to view">
+      <button type="button" data-flow="before" aria-pressed="true">Before</button>
+      <button type="button" data-flow="improved" aria-pressed="false">Improved</button>
+    </div>
+    <button type="button" class="ghostbtn" id="restart">Restart flow</button>
+    <span class="hint">Tap the buttons inside the phone. Numbered dots open the reasoning.</span>
+  </div>
+
+  <div class="stage" id="stage">
+    <div>
+      <ol class="rail" id="rail" aria-label="Onboarding steps">
+        <li data-step="1"><i class="dot"></i><span class="lbl">Mobile number</span><span class="sub">Step 1</span></li>
+        <li data-step="2"><i class="dot"></i><span class="lbl">One-time code</span><span class="sub">Step 2</span></li>
+        <li data-step="3" class="leak"><i class="dot"></i><span class="lbl">Identity (Aadhaar)</span><span class="sub" id="leaksub">38.5% lost here</span></li>
+        <li data-step="4"><i class="dot"></i><span class="lbl">Through KYC</span><span class="sub">Step 4</span></li>
+      </ol>
+      <p class="funnelnote">Simulated funnel<br><b>10,000</b> sign-ups<br><b>3,300</b> finish (33%)<br>Source: my Onboarding Funnel &amp; KYC Drop-Off case study.</p>
+    </div>
+
+    <div class="phonewrap">
+      <div class="phone" aria-label="Phone prototype">
+        <div class="screen" id="screen">
+          <div class="sb"><span>9:41</span><i></i><span>5G ▮▮▮</span></div>
+
+          <!-- BEFORE -->
+          <div class="scr old" id="b1" hidden>
+            <div class="brand">anvay</div>
+            <h2 class="h">Welcome to Anvay</h2>
+            <div class="fld"><label for="b1m">Mobile number</label><input class="in" id="b1m" value="98765 43210" inputmode="numeric" autocomplete="off"></div>
+            <div class="spacer"></div>
+            <button class="btn" data-go="b2">Get OTP</button>
+            <p class="fine">By continuing you accept the Terms and Privacy Policy.</p>
+          </div>
+          <div class="scr old" id="b2" hidden>
+            <div class="brand">anvay</div>
+            <h2 class="h">Enter OTP</h2>
+            <p class="p">Sent to +91 98765 43210</p>
+            <div class="fld"><label for="b2o">6-digit OTP</label><input class="in otp" id="b2o" value="482916" inputmode="numeric" maxlength="6" autocomplete="off"></div>
+            <p class="p">Resend OTP in 00:24</p>
+            <div class="spacer"></div>
+            <button class="btn" data-go="b3">Verify</button>
+          </div>
+          <div class="scr old" id="b3" hidden>
+            <div class="brand">anvay</div>
+            <div class="rel"><h2 class="h">Upload Aadhaar card</h2><button class="pin" data-pin="A" aria-label="Annotation A">A</button></div>
+            <p class="p">Mandatory for account opening.</p>
+            <div class="rel">
+              <div class="ups"><div class="up">Front side<br><br>Tap to upload</div><div class="up">Back side<br><br>Tap to upload</div></div>
+              <button class="pin" data-pin="B" aria-label="Annotation B">B</button>
+            </div>
+            <div class="fld"><label for="b3a">Aadhaar number</label><input class="in" id="b3a" placeholder="12-digit number" inputmode="numeric" autocomplete="off"></div>
+            <div class="spacer"></div>
+            <button class="btn" data-act="upload">Upload &amp; continue</button>
+          </div>
+          <div class="scr old" id="b4" hidden>
+            <div class="brand">anvay</div>
+            <div class="errbox"><b>Image not clear</b>We couldn't read your Aadhaar card. Please upload a clear photo and try again.</div>
+            <div class="spacer"></div>
+            <button class="btn" data-go="b3">Try again</button>
+            <button class="lnk" data-go="b5">Close app</button>
+          </div>
+          <div class="scr old gone" id="b5" hidden>
+            <div class="spacer"></div>
+            <div class="big">38.5%</div>
+            <h2 class="h">…left right here.</h2>
+            <p class="p">They closed the app on the Aadhaar upload. Most never came back.</p>
+            <div class="spacer"></div>
+            <button class="btn" data-go="b1">Start over</button>
+          </div>
+          <div class="scr old" id="b6" hidden>
+            <div class="brand">anvay</div>
+            <h2 class="h">Aadhaar received</h2>
+            <p class="p">You can continue setting up your account.</p>
+            <div class="spacer"></div>
+            <button class="btn" data-go="b1">Continue</button>
+          </div>
+
+          <!-- IMPROVED -->
+          <div class="scr new" id="i1" hidden>
+            <div class="brand">anvay</div>
+            <div class="prog" aria-hidden="true"><span class="on"></span><span></span><span></span><span></span></div>
+            <div class="proglbl">Step 1 of 4 · Your number</div>
+            <h2 class="h">Open your Anvay account</h2>
+            <p class="p">Four short steps. After the code, you'll confirm your identity through DigiLocker, so there's no card to photograph.</p>
+            <div class="fld"><label for="i1m">Mobile number</label><input class="in" id="i1m" value="98765 43210" inputmode="numeric" autocomplete="off"></div>
+            <div class="spacer"></div>
+            <button class="btn" data-go="i2">Send code</button>
+            <p class="fine">By continuing you accept the Terms and Privacy Policy.</p>
+          </div>
+          <div class="scr new" id="i2" hidden>
+            <div class="brand">anvay</div>
+            <div class="prog" aria-hidden="true"><span class="on"></span><span class="on"></span><span></span><span></span></div>
+            <div class="proglbl">Step 2 of 4 · Code</div>
+            <h2 class="h">Enter the code</h2>
+            <p class="p" id="i2sent">Sent by SMS to +91 98765 43210</p>
+            <div class="rel">
+              <div class="fld"><label for="i2o">6-digit code</label><input class="in otp" id="i2o" value="" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div>
+              <button class="pin" data-pin="A" aria-label="Annotation A">A</button>
+            </div>
+            <span class="chip" id="i2chip" hidden>Read from your messages</span>
+            <button class="lnk" id="i2call">Code not arriving? Get it by call</button>
+            <div class="spacer"></div>
+            <button class="btn" data-go="i3">Continue</button>
+          </div>
+          <div class="scr new" id="i3" hidden>
+            <div class="brand">anvay</div>
+            <div class="prog" aria-hidden="true"><span class="on"></span><span class="on"></span><span class="on"></span><span></span></div>
+            <div class="proglbl">Step 3 of 4 · Identity</div>
+            <h2 class="h">Confirm who you are</h2>
+            <p class="p">We'll fetch your details from DigiLocker. You don't need to photograph anything.</p>
+            <div class="rel">
+              <div class="card two">
+                <div class="yes"><h4>We take</h4><ul><li>Name</li><li>Date of birth</li><li>Address</li><li>Photo</li></ul></div>
+                <div class="no"><h4>We don't take</h4><ul><li>Your full Aadhaar number</li><li>Anything else in your locker</li></ul></div>
+              </div>
+              <button class="pin" data-pin="A" aria-label="Annotation A">A</button>
+            </div>
+            <div class="rel">
+              <label class="chk" for="i3c"><input type="checkbox" id="i3c"><span>I allow Anvay to fetch these details to verify my identity.</span></label>
+              <button class="pin" data-pin="B" aria-label="Annotation B" style="top:-14px">B</button>
+            </div>
+            <div class="spacer"></div>
+            <div class="rel">
+              <button class="btn" id="i3go" data-go="i4" disabled>Continue to DigiLocker</button>
+              <button class="pin" data-pin="C" aria-label="Annotation C">C</button>
+            </div>
+            <button class="lnk" data-go="i3b">No DigiLocker account? Use a photo instead</button>
+          </div>
+          <div class="scr new" id="i4" hidden>
+            <div class="brand">anvay</div>
+            <div class="prog" aria-hidden="true"><span class="on"></span><span class="on"></span><span class="on"></span><span></span></div>
+            <div class="proglbl">Step 3 of 4 · Identity</div>
+            <div class="spacer"></div>
+            <div class="spin" aria-hidden="true"></div>
+            <h2 class="h" style="text-align:center">Opening DigiLocker</h2>
+            <p class="p" style="text-align:center">You'll approve sharing there, then come straight back here. We never see your DigiLocker password.</p>
+            <div class="spacer"></div>
+            <button class="btn" data-go="i5">Approve and return (demo)</button>
+            <p class="fine">In the real flow this happens on DigiLocker's own screen.</p>
+          </div>
+          <div class="scr new" id="i3b" hidden>
+            <div class="brand">anvay</div>
+            <div class="prog" aria-hidden="true"><span class="on"></span><span class="on"></span><span class="on"></span><span></span></div>
+            <div class="proglbl">Step 3 of 4 · Identity</div>
+            <h2 class="h">Photograph your Aadhaar</h2>
+            <p class="p">Lay the card flat. We'll capture it when it's sharp.</p>
+            <div class="rel">
+              <div class="cam" id="cam"><div class="frame"><i></i><i></i><i></i><i></i></div><span class="hintchip" id="camchip">Fit the card inside the corners</span></div>
+              <button class="pin" data-pin="A" aria-label="Annotation A">A</button>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn" id="capbtn">Start capture (demo)</button>
+          </div>
+          <div class="scr new" id="i5" hidden>
+            <div class="brand">anvay</div>
+            <div class="prog" aria-hidden="true"><span class="on"></span><span class="on"></span><span class="on"></span><span></span></div>
+            <div class="proglbl">Step 3 of 4 · Identity</div>
+            <h2 class="h">Check your details</h2>
+            <div class="rel">
+              <div class="card">
+                <div class="row"><span>Name</span><b>Aarav Nair</b></div>
+                <div class="row"><span>Date of birth</span><b>14 Mar 1998</b></div>
+                <div class="row"><span>Address</span><b>Flat 204, Lakeview Residency, Madhapur, Hyderabad 500081</b></div>
+                <div class="row"><span>Aadhaar</span><b style="font-family:var(--mono)">XXXX XXXX 1956</b></div>
+              </div>
+              <button class="pin" data-pin="A" aria-label="Annotation A">A</button>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn" data-go="i6">These are correct</button>
+            <button class="lnk" data-go="i3b">Something's wrong? Use a photo instead</button>
+          </div>
+          <div class="scr new" id="i6" hidden>
+            <div class="brand">anvay</div>
+            <div class="prog" aria-hidden="true"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></div>
+            <div class="proglbl">Step 4 of 4 · Done</div>
+            <div class="spacer"></div>
+            <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+            <h2 class="h">You're verified</h2>
+            <p class="p">Your account is ready. Identity confirmed through DigiLocker on today's date.</p>
+            <div class="spacer"></div>
+            <button class="btn" data-go="i1">Add money to start</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes" id="notes" aria-live="polite">
+      <div class="ncard">
+        <span class="tag" id="ntag"></span>
+        <h2 id="ntitle"></h2>
+        <p class="txt" id="ntext"></p>
+        <div class="decide" id="ndecide" hidden><span class="k">Decision</span><p id="ndecidetxt"></p></div>
+        <ul class="pins" id="npins"></ul>
+        <div class="reqs" id="nreqs"></div>
+      </div>
+      <div class="metricbar"><span>Metric this moves</span><b>KYC completion rate</b><span>baseline 33%, driven by the Aadhaar step</span></div>
+    </div>
+  </div>
+
+  <section aria-labelledby="cf-h">
+    <h2 class="sec" id="cf-h">Three reasons people left, and what answers each</h2>
+    <div class="cf">
+      <div class="cfc"><span class="tag">Trust</span><div class="q">"Why do you need a photo of my Aadhaar?"</div><p>The old screen never says. Users who hesitate leave without ever seeing an error.</p><span class="arrow">Answered by</span><p>A plain list of what we take and what we don't, shown before the consent tick. Aadhaar appears masked on every screen after.</p></div>
+      <div class="cfc"><span class="tag">Technical</span><div class="q">"It keeps saying the image isn't clear."</div><p>Quality is checked after upload, with no reason given. Each retry repeats the whole step.</p><span class="arrow">Answered by</span><p>DigiLocker fetch removes the photo for most users. The photo fallback guides the capture before it fails.</p></div>
+      <div class="cfc"><span class="tag">Technical</span><div class="q">"The code hasn't come."</div><p>One channel, one timer. A slow SMS ends the session before KYC even starts.</p><span class="arrow">Answered by</span><p>The code is read from the SMS when possible, and a call is offered when it isn't.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="m-h">
+    <h2 class="sec" id="m-h">How I'd know it worked</h2>
+    <div class="metric">
+      <div>
+        <h3>Aadhaar-step loss, drawn to scale</h3>
+        <div class="big2">
+          <div><span class="n red">38.5%</span><span class="l">lost at Aadhaar upload today (simulated)</span></div>
+          <div><span class="n" style="color:var(--fix)">&lt;20%</span><span class="l">my proposed target, to be tested</span></div>
+        </div>
+        <div class="scale" role="img" aria-label="Bar from 0 to 50 percent. Current loss 38.5 percent. Target marker at 20 percent.">
+          <div class="track"><div class="fillbar" style="width:77%"></div><div class="tgt" style="left:40%"></div></div>
+          <div class="ticks"><span class="s" style="left:0">0%</span><span style="left:50%">25%</span><span class="e" style="left:100%">50%</span><span class="t2" style="left:40%">target 20%</span><span class="t1" style="left:77%">today 38.5%</span></div>
+        </div>
+      </div>
+      <ul class="mlist">
+        <li><b>The test</b>Split new sign-ups 50/50 between the old and new flow. Run full weeks so weekday and weekend behaviour both count.</li>
+        <li><b>Read the exits by cause</b>Tag every exit: left on the consent screen (trust), left at the DigiLocker handoff or photo step (technical). The old funnel can't tell these apart.</li>
+        <li><b>Guardrails</b>Details-mismatch rate on the review screen must not rise. Consent must be recorded for 100% of fetches.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section aria-labelledby="l-h">
+    <h2 class="sec" id="l-h">Requirement IDs used above</h2>
+    <div class="legend">
+      <table>
+        <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+        <tbody>
+          <tr><td>FR-01</td><td>Show the four steps and name the ID step on the first screen.</td></tr>
+          <tr><td>FR-02</td><td>Read the OTP from the SMS when possible. Offer a call when the SMS is late.</td></tr>
+          <tr><td>FR-03</td><td>Fetch identity details from DigiLocker. No Aadhaar photo in the main path.</td></tr>
+          <tr><td>FR-04</td><td>Show fetched details for confirmation. Wrong details route to the photo path.</td></tr>
+          <tr><td>FR-05</td><td>Photo fallback gives live guidance before capture and rejects with a reason.</td></tr>
+          <tr><td>REG-01</td><td>Record explicit consent, with a timestamp, before any identity data is fetched.</td></tr>
+          <tr><td>REG-02</td><td>Never display the Aadhaar number in full. Show it masked.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot">Figures come from my simulated 10,000-user funnel, not a live product. Anvay Money is a made-up brand and the DigiLocker screen is a placeholder. The IDs match the BRD and FRD in my KYC Requirements Pack. Regulatory wording would be confirmed with a compliance team before build.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  var app=document.getElementById('app');
+  var NOTES={
+    b1:{tag:'Before',k:'',title:'A number, and no clue what comes next',text:'The user hands over a phone number without knowing a government ID is coming. Nothing here is wrong. It just sets no expectation.',reqs:[]},
+    b2:{tag:'Before',k:'',title:'One channel, one timer',text:'If the SMS is slow, the only move is to wait out the timer. That is a technical exit before KYC has even begun.',reqs:[]},
+    b3:{tag:'Drop-off point',k:'',title:'Aadhaar upload: the biggest single leak',text:'Two photos and a 12-digit number, with no reason given. Users who hesitate are asking why (trust). Users who try get rejected for blur or glare (technical).',reqs:[],
+      pins:{A:'No explanation of why this is needed, what is stored, or who sees it.',B:'Photo quality is judged after upload, so the user learns they failed only at the end.'}},
+    b4:{tag:'Drop-off point',k:'',title:'Rejected, with no cause',text:'The error does not say what was wrong (glare, blur, a cropped edge), so the user repeats the same photo. Tap "Try again" and watch how many rounds it takes.',reqs:[]},
+    b5:{tag:'Drop-off',k:'',title:'This is where they leave',text:'Closing the app is the exit. In the simulated funnel, 38.5% were lost at this step, and the case study separates trust-driven exits from technical ones.',reqs:[]},
+    b6:{tag:'Before',k:'',title:'Through, after three tries',text:'Only users who persist through two rejections reach here. Everyone with less patience or less light is gone.',reqs:[]},
+    i1:{tag:'Improved',fix:1,title:'Say what is coming',text:'The first screen shows four steps and names the ID step before it arrives.',decide:'Set expectations on screen one so the Aadhaar step is never a surprise. A user who has already been told "no card to photograph" reaches step 3 with less doubt.',reqs:['FR-01']},
+    i2:{tag:'Improved',fix:1,title:'The code arrives on its own, with a fallback',text:'The code is read from the SMS and a call is offered if it is late.',decide:'A slow SMS should not cost a sign-up. Auto-read removes typing, and a call gives a second route without leaving the screen.',reqs:['FR-02'],pins:{A:'Code fills itself in. "Get it by call" appears at once, so the user is never stuck waiting on a timer.'}},
+    i3:{tag:'The fix',fix:1,title:'Ask once, explain first, no photo',text:'This replaces the Aadhaar photo upload. The old screen asked for the most sensitive document with no explanation. This one explains, asks for consent, and fetches the details itself.',decide:'Swap photo upload for a DigiLocker fetch, and put "what we take / what we don\'t" above the consent tick. That removes the blur-and-reject loop (technical) and answers "why do you need this?" before the user has to ask it (trust).',reqs:['FR-03','REG-01','REG-02'],
+      pins:{A:'Trust: the list names exactly what is fetched and what is left alone.',B:'Compliance: consent is a deliberate tick, recorded with a timestamp, before anything is fetched (REG-01).',C:'The button stays off until consent is given. It names the next place the user is going.'}},
+    i4:{tag:'Improved',fix:1,title:'Hand off with a way back',text:'The user leaves for DigiLocker and returns here.',decide:'Say where they are going and that they will return. The risk of leaving moves to this screen, so I would track exits here separately from the consent screen.',reqs:['FR-03']},
+    i3b:{tag:'Improved',fix:1,title:'The fallback guides before it fails',text:'For users with no DigiLocker account, the photo path is still there, but it helps while they shoot.',decide:'Corner guides and a live hint (move closer, hold steady) replace upload-then-reject. The prototype shows the intent. The FRD would define what the on-device checks must catch.',reqs:['FR-05'],pins:{A:'Feedback arrives during capture, not after upload.'}},
+    i5:{tag:'Improved',fix:1,title:'Show what we got, masked',text:'The user confirms the fetched details before anything is saved.',decide:'Wrong details route to the photo path instead of a dead end. The Aadhaar number appears only as XXXX XXXX 1956.',reqs:['FR-04','REG-02'],pins:{A:'Masked Aadhaar number (REG-02). Full number is never shown.'}},
+    i6:{tag:'Improved',fix:1,title:'Verified, then one next step',text:'The flow ends on a single action, not a menu.',decide:'One clear first action keeps the user moving while they are still engaged.',reqs:[]}
+  };
+  var STEP={b1:1,b2:2,b3:3,b4:3,b5:3,b6:4,i1:1,i2:2,i3:3,i4:3,i3b:3,i5:3,i6:4};
+  var FIRST={before:'b1',improved:'i1'};
+  var state={flow:'before',cur:'b1',attempts:0};
+  var timers=[];
+  function clearT(){timers.forEach(clearTimeout);timers=[]}
+  var rm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function $(id){return document.getElementById(id)}
+  function show(id){
+    clearT();
+    state.cur=id;
+    document.querySelectorAll('.scr').forEach(function(s){s.hidden=(s.id!==id)});
+    renderNotes(id);
+    renderRail(id);
+    var s=$(id);s.scrollTop=0;
+    if(id==='i2')autofill();
+    if(id==='i3'){$('i3c').checked=false;$('i3go').disabled=true}
+    if(id==='i3b')resetCam();
+  }
+  function renderNotes(id){
+    var n=NOTES[id]||{};
+    var tag=$('ntag');tag.textContent=n.tag||'';tag.className='tag'+(n.fix?' fix':'');
+    var t=n.title;
+    if(id==='b4')t='Rejected, with no cause · attempt '+Math.max(state.attempts,1);
+    $('ntitle').textContent=t||'';
+    $('ntext').textContent=n.text||'';
+    var d=$('ndecide');
+    if(n.decide){d.hidden=false;$('ndecidetxt').textContent=n.decide}else{d.hidden=true}
+    var ul=$('npins');ul.innerHTML='';
+    if(n.pins){Object.keys(n.pins).forEach(function(k){
+      var li=document.createElement('li');li.setAttribute('data-pin',k);
+      var b=document.createElement('b');b.textContent=k;
+      var sp=document.createElement('span');sp.textContent=n.pins[k];
+      li.appendChild(b);li.appendChild(sp);ul.appendChild(li)})}
+    var r=$('nreqs');r.innerHTML='';
+    (n.reqs||[]).forEach(function(q){var s=document.createElement('span');s.textContent=q;r.appendChild(s)});
+  }
+  function renderRail(id){
+    var cur=STEP[id];
+    document.querySelectorAll('#rail li').forEach(function(li){
+      var n=+li.getAttribute('data-step');
+      li.classList.toggle('now',n===cur);
+      li.classList.toggle('done',n<cur);
+    });
+  }
+  function setFlow(f){
+    state.flow=f;state.attempts=0;
+    app.setAttribute('data-mode',f);
+    app.className='wrap mode-'+f;
+    document.querySelectorAll('.seg button').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-flow')===f?'true':'false')});
+    $('leaksub').textContent=f==='before'?'38.5% lost here':'Goal: under 20% (to test)';
+    show(FIRST[f]);
+  }
+  function autofill(){
+    var inp=$('i2o'),chip=$('i2chip');
+    inp.value='';chip.hidden=true;$('i2sent').textContent='Sent by SMS to +91 98765 43210';
+    var code='482916';
+    if(rm){inp.value=code;chip.hidden=false;return}
+    for(var i=1;i<=6;i++){(function(i){timers.push(setTimeout(function(){inp.value=code.slice(0,i);if(i===6)chip.hidden=false},500+i*160))})(i)}
+  }
+  function resetCam(){
+    $('cam').classList.remove('ok');$('camchip').textContent='Fit the card inside the corners';
+    $('capbtn').disabled=false;$('capbtn').textContent='Start capture (demo)';
+  }
+
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('button,[data-go]');if(!t)return;
+    if(t.classList.contains('pin')){
+      var k=t.getAttribute('data-pin');
+      document.querySelectorAll('#npins li').forEach(function(li){li.classList.toggle('on',li.getAttribute('data-pin')===k)});
+      return;
+    }
+    if(t.hasAttribute('data-flow')){setFlow(t.getAttribute('data-flow'));return}
+    if(t.id==='restart'){setFlow(state.flow);return}
+    if(t.getAttribute('data-act')==='upload'){
+      state.attempts++;
+      show(state.attempts>=3?'b6':'b4');return;
+    }
+    if(t.id==='i2call'){
+      $('i2sent').textContent='Calling +91 ••••• 43210 now. Pick up to hear your code.';
+      $('i2chip').hidden=true;return;
+    }
+    if(t.id==='capbtn'){
+      t.disabled=true;
+      $('camchip').textContent='Move a little closer';
+      timers.push(setTimeout(function(){$('camchip').textContent='Hold steady'},rm?0:800));
+      timers.push(setTimeout(function(){$('cam').classList.add('ok');$('camchip').textContent='Captured'},rm?0:1700));
+      timers.push(setTimeout(function(){show('i5')},rm?200:2400));
+      return;
+    }
+    var g=t.getAttribute('data-go');
+    if(g){if(g==='b1'||g==='i1'){state.attempts=0}show(g)}
+  });
+  document.getElementById('i3c').addEventListener('change',function(e){$('i3go').disabled=!e.target.checked});
+  setFlow('before');
+})();
+</script>
+
+</body></html>
